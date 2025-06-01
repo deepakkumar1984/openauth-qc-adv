@@ -1,125 +1,119 @@
 -- Cloudflare D1 Schema for Quantum Adventure
 
+DROP TABLE IF EXISTS UserAchievements;
+DROP TABLE IF EXISTS UserProgress;
+DROP TABLE IF EXISTS LearningUnits;
+DROP TABLE IF EXISTS Achievements;
+DROP TABLE IF EXISTS CourseSections;
+DROP TABLE IF EXISTS Courses;
+DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS UserPoints;
+DROP TABLE IF EXISTS Sessions;
+
 -- Users Table: Stores information about registered users
 CREATE TABLE Users (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the user
-    email TEXT NOT NULL UNIQUE, -- User's email, must be unique
-    username TEXT NOT NULL UNIQUE, -- User's chosen username, must be unique
-    hashed_password TEXT, -- Hashed password for email/password auth
-    auth_provider TEXT DEFAULT 'email', -- To distinguish between email/pass and OAuth users ('email', 'google', 'facebook', 'github')
-    provider_id TEXT, -- Unique ID from the OAuth provider, null for email/password users
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of user creation
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- Timestamp of last update
+    id INTEGER PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL UNIQUE,
+    hashed_password TEXT,
+    auth_provider TEXT DEFAULT 'email',
+    provider_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Courses Table: Stores information about available courses
 CREATE TABLE Courses (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the course
-    title TEXT NOT NULL, -- Title of the course (e.g., "Quantum Adventure 101")
-    description TEXT, -- Detailed description of the course
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of course creation
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP  -- Timestamp of last update
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    level TEXT, -- Course difficulty level (e.g., 'Beginner', 'Intermediate', 'Advanced')
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- CourseSections Table: Represents main sections/chapters within a course (maps to top-level MODULES in constants.tsx)
+-- CourseSections Table: Represents main sections/chapters within a course
 CREATE TABLE CourseSections (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the section
-    course_id INTEGER NOT NULL, -- Foreign key referencing the Courses table
-    external_id TEXT UNIQUE, -- Optional unique ID for mapping to content files (e.g., 'intro-qubits')
-    title TEXT NOT NULL, -- Title of the section (e.g., "The Quantum Leap: Meet the Qubit")
-    icon_ref TEXT, -- String reference for the icon (e.g., "AcademicCapIcon", frontend maps to component)
-    story_intro TEXT, -- Introductory narrative for the section
-    summary TEXT, -- Summary of the section
-    section_order INTEGER, -- Defines the sequence of sections within a course
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of section creation
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- Timestamp of last update
+    id INTEGER PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    external_id TEXT UNIQUE,
+    title TEXT NOT NULL,
+    icon_ref TEXT,
+    story_intro TEXT,
+    summary TEXT,
+    section_order INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_id) REFERENCES Courses(id) ON DELETE CASCADE
 );
 
--- LearningUnits Table: Stores individual learning units or activities within a CourseSection (maps to concepts in constants.tsx)
+-- LearningUnits Table: Stores individual learning units or activities
 CREATE TABLE LearningUnits (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the learning unit
-    section_id INTEGER NOT NULL, -- Foreign key referencing the CourseSections table
-    external_id TEXT UNIQUE, -- Optional unique ID for mapping to content files (e.g., 'c1-1-classical-vs-qubits')
-    title TEXT NOT NULL, -- Title of the learning unit
-    explanation TEXT, -- Main content/explanation (can be Markdown/HTML)
-    -- unit_type helps the frontend decide how to render the unit and what data to expect
-    -- e.g., 'INFO', 'QUBIT_VISUALIZER', 'GATE_APPLICATION', 'QUIZ', 'CIRCUIT_BUILDER', 'BELL_STATE', 'REFLECTION_PROMPT'
+    id INTEGER PRIMARY KEY,
+    section_id INTEGER NOT NULL,
+    external_id TEXT UNIQUE,
+    title TEXT NOT NULL,
     unit_type TEXT NOT NULL,
-    -- unit_data stores type-specific configuration as a JSON string
-    -- e.g., for 'QUIZ': { "question": "...", "options": [...], "feedbackCorrect": "..." }
-    -- e.g., for 'QUBIT_VISUALIZER': { "initialAlpha": 1, "initialBeta": 0 }
-    -- e.g., for 'REFLECTION_PROMPT': { "prompt": "What did you learn?" }
-    unit_data TEXT, -- JSON blob for storing data specific to the unit_type
-    unit_order INTEGER, -- Defines the sequence of learning units within a section
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of unit creation
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- Timestamp of last update
+    unit_data TEXT, -- JSON blob
+    unit_order INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (section_id) REFERENCES CourseSections(id) ON DELETE CASCADE
 );
 
 -- UserProgress Table: Tracks user progress for each learning unit
 CREATE TABLE UserProgress (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the progress record
-    user_id INTEGER NOT NULL, -- Foreign key referencing the Users table
-    learning_unit_id INTEGER NOT NULL, -- Foreign key referencing the LearningUnits table
-    -- Status of the learning unit for the user
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    learning_unit_id INTEGER NOT NULL,
     status TEXT CHECK(status IN ('not_started', 'in_progress', 'completed', 'attempted')) DEFAULT 'not_started',
-    score INTEGER, -- Score obtained by the user (e.g., for quizzes)
-    -- progress_data stores user-specific interaction data as a JSON string
-    -- e.g., for 'QUIZ': { "answers": [{"option_id": "...", "is_correct": true/false}], "final_score": ... }
-    -- e.g., for 'REFLECTION_PROMPT': { "response_text": "User's reflection..." }
-    -- e.g., for 'CIRCUIT_BUILDER': { "user_circuit_config": {...} }
-    progress_data TEXT, -- JSON blob for storing detailed progress (e.g., quiz answers, reflection text, simulator state)
-    started_at DATETIME, -- Timestamp when the user started the learning unit
-    completed_at DATETIME, -- Timestamp when the user completed the learning unit
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of last progress update
+    score INTEGER,
+    progress_data TEXT, -- JSON blob
+    started_at DATETIME,
+    completed_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
     FOREIGN KEY (learning_unit_id) REFERENCES LearningUnits(id) ON DELETE CASCADE,
-    UNIQUE (user_id, learning_unit_id) -- Ensures one progress record per user per learning unit
+    UNIQUE (user_id, learning_unit_id)
 );
 
--- Achievements Table: Defines various achievements or badges users can earn
+-- Achievements Table: Defines various achievements or badges
 CREATE TABLE Achievements (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the achievement
-    name TEXT NOT NULL UNIQUE, -- Name of the achievement (e.g., "Quantum Leap")
-    description TEXT, -- Description of how to earn the achievement
-    icon_url TEXT, -- URL or reference to an icon representing the achievement
-    -- criteria_type helps in programmatically checking for achievement unlocks
-    -- e.g., 'COMPLETE_LEARNING_UNIT', 'COMPLETE_SECTION', 'SCORE_THRESHOLD_QUIZ', 'LOGIN_STREAK'
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    icon_url TEXT,
     criteria_type TEXT NOT NULL,
-    -- criteria_value stores the specific value for the criteria
-    -- e.g., learning_unit_id for 'COMPLETE_LEARNING_UNIT', section_id for 'COMPLETE_SECTION',
-    -- target score for 'SCORE_THRESHOLD_QUIZ', or JSON for more complex criteria
     criteria_value TEXT NOT NULL,
-    points_awarded INTEGER DEFAULT 0 -- Points awarded for this achievement
+    points_awarded INTEGER DEFAULT 0
 );
 
 -- UserAchievements Table: Tracks achievements earned by users
 CREATE TABLE UserAchievements (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the earned achievement record
-    user_id INTEGER NOT NULL, -- Foreign key referencing the Users table
-    achievement_id INTEGER NOT NULL, -- Foreign key referencing the Achievements table
-    earned_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp when the achievement was earned
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    achievement_id INTEGER NOT NULL,
+    earned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
     FOREIGN KEY (achievement_id) REFERENCES Achievements(id) ON DELETE CASCADE,
-    UNIQUE (user_id, achievement_id) -- Ensures a user earns an achievement only once
+    UNIQUE (user_id, achievement_id)
 );
 
--- UserPoints Table: Stores gamification points for users, can be used for leaderboards
+-- UserPoints Table: Stores gamification points for users
 CREATE TABLE UserPoints (
-    user_id INTEGER PRIMARY KEY, -- Foreign key referencing the Users table, also primary key
-    total_points INTEGER DEFAULT 0, -- Total points accumulated by the user
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of the last points update
+    user_id INTEGER PRIMARY KEY,
+    total_points INTEGER DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 );
 
 -- Sessions Table: Stores user session tokens for authentication
 CREATE TABLE Sessions (
-    id INTEGER PRIMARY KEY, -- Auto-incrementing ID for the session
-    user_id INTEGER NOT NULL, -- Foreign key referencing the Users table
-    token TEXT NOT NULL UNIQUE, -- Session token (UUID)
-    expires_at DATETIME NOT NULL, -- Expiration timestamp for the session
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of session creation
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 );
 
