@@ -8,7 +8,7 @@ import { BellStateExplorer } from './interactive/BellStateExplorer';
 import { CircuitSimulator } from './interactive/CircuitSimulator';
 
 interface ModuleContentProps {
-  module: Module;
+  module: Omit<Module, 'icon'> & { icon: React.ReactNode }; // Expect ReactNode for icon
   onNextModule: () => void;
   onPrevModule: () => void;
   isFirstModule: boolean;
@@ -59,18 +59,22 @@ const renderInteractiveElement = (concept: Concept): React.ReactNode => {
 export const ModuleContent: React.FC<ModuleContentProps> = ({ module, onNextModule, onPrevModule, isFirstModule, isLastModule, isModuleCompleted }) => {
   return (
     <article className="animate-fade-in bg-slate-800/30 shadow-2xl rounded-xl p-6 md:p-10">
-      <header className="mb-8 pb-6 border-b border-slate-700">
-        <h2 className="text-4xl font-bold text-quantum-particle mb-3">{module.title}</h2>
-        <p className="text-lg text-quantum-text-secondary italic">{module.storyIntro}</p>
+      <header className="mb-8 pb-6 border-b border-slate-700 flex items-center">
+        {module.icon && <div className="mr-4 text-quantum-particle">{module.icon}</div>} {/* Display icon if provided */}
+        <div>
+            <h2 className="text-4xl font-bold text-quantum-particle mb-1">{module.title}</h2>
+            <p className="text-lg text-quantum-text-secondary italic">{module.storyIntro}</p>
+        </div>
       </header>
 
       <div className="space-y-10">
         {module.concepts.map((concept, index) => (
           <section key={concept.id} className="animate-slide-in-left p-6 bg-slate-700/40 rounded-lg shadow-lg" style={{ animationDelay: `${index * 100}ms`}}>
             <h3 className="text-2xl font-semibold text-quantum-glow mb-4">{concept.title}</h3>
-            <div className="prose prose-invert prose-sm md:prose-base max-w-none text-quantum-text-primary leading-relaxed space-y-3">
-              {typeof concept.explanation === 'string' ? <p>{concept.explanation}</p> : concept.explanation}
-            </div>
+            <div 
+              className="prose prose-invert prose-sm md:prose-base max-w-none text-quantum-text-primary leading-relaxed space-y-3"
+              dangerouslySetInnerHTML={{ __html: concept.explanation }} // Render HTML string
+            />
             {concept.type !== QuantumConceptType.INFO && (
               <div className="mt-6 p-4 bg-slate-900/50 rounded-md border border-slate-600">
                 {renderInteractiveElement(concept)}

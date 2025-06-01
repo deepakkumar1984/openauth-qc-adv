@@ -1,16 +1,16 @@
 // Courses API module using Hono
 import { Hono } from 'hono';
-import { Env, Variables } from './types';
+import { Env } from './types'; // Removed Variables import
 import { authMiddleware } from './utils';
 
 function createCoursesModule() {
-  const app = new Hono<{ Bindings: Env; Variables: Variables }>();
+  const app = new Hono<{ Bindings: Env }>();
 
 // GET /courses - List all courses
 app.get('/', authMiddleware, async (c) => {
   try {
     const courses = await c.env.DB.prepare(
-      'SELECT id, title, description, created_at, updated_at FROM Courses ORDER BY id'
+      'SELECT id, title, description, level, created_at, updated_at FROM Courses ORDER BY id'
     ).all();
     
     return c.json({ courses: courses.results });
@@ -47,6 +47,9 @@ app.get('/sections/:sectionId/units', authMiddleware, async (c) => {
   }
 
   try {
+    // Ensure the 'explanation' field is selected, which it already is.
+    // The content of 'explanation' in the DB should be a string (HTML/Markdown).
+    // 'unit_data' will continue to be a JSON string.
     const units = await c.env.DB.prepare(
       'SELECT id, external_id, title, explanation, unit_type, unit_data, unit_order FROM LearningUnits WHERE section_id = ?1 ORDER BY unit_order'
     ).bind(sectionId).all();

@@ -1,28 +1,38 @@
 // Shared utilities for authentication
 import { getCookie, deleteCookie } from 'hono/cookie';
-import { jwtVerify } from 'jose';
-import { Env, SessionJwtPayload, JWT_COOKIE_NAME } from './types';
 
-export async function getJwtSecret(env: Env): Promise<Uint8Array> {
-  return new TextEncoder().encode(env.JWT_SECRET);
-}
 
-// Auth middleware to verify JWT
+// Auth middleware to verify database-backed session
 export async function authMiddleware(c: any, next: any) {
-  const sessionToken = getCookie(c, JWT_COOKIE_NAME);
+  const sessionToken = getCookie(c, 'session'); // Use 'session' cookie name
   
   if (!sessionToken) {
     return c.json({ error: 'Authentication required' }, 401);
   }
 
   try {
-    const secret = await getJwtSecret(c.env);
-    const { payload } = await jwtVerify(sessionToken, secret) as { payload: SessionJwtPayload };
-    c.set('userId', payload.userId);
-    c.set('userEmail', payload.email);
+    // Find valid session in the database
+    const query = await c.env.DB.prepare(
+      `SELECT s.user_id, u.email 
+       FROM Sessions s 
+       JOIN Users u ON s.user_id = u.id 
+       WHERE s.token = ? AND s.expires_at > CURRENT_TIMESTAMP`
+    ).bind(sessionToken);
+    
+    const sessionAndUser = await query.first() as { user_id: number; email: string } | null;
+
+    if (!sessionAndUser) {
+      deleteCookie(c, 'session'); // Clear invalid or expired session cookie
+      return c.json({ error: 'Invalid or expired session' }, 401);
+    }
+
+    c.set('userId', sessionAndUser.user_id);
+    c.set('userEmail', sessionAndUser.email);
     await next();
   } catch (err) {
-    deleteCookie(c, JWT_COOKIE_NAME);
-    return c.json({ error: 'Invalid session' }, 401);
+    console.error('Auth middleware error:', err);
+    // It's good practice to also clear the cookie if an unexpected error occurs
+    deleteCookie(c, 'session'); 
+    return c.json({ error: 'Internal server error during authentication' }, 500);
   }
 }

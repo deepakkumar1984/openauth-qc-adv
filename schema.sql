@@ -53,6 +53,7 @@ CREATE TABLE LearningUnits (
     section_id INTEGER NOT NULL,
     external_id TEXT UNIQUE,
     title TEXT NOT NULL,
+    explanation TEXT, -- Added explanation column for HTML/Markdown content
     unit_type TEXT NOT NULL,
     unit_data TEXT, -- JSON blob
     unit_order INTEGER,
