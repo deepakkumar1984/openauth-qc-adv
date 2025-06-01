@@ -4,9 +4,13 @@ import { Sidebar } from './components/Sidebar';
 import { ModuleContent } from './components/ModuleContent';
 import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
-import type { Module as FrontendModule, ApiCourse, ApiCourseSection, ApiLearningUnit, QuantumConceptType as QCTEnum } from './types'; // Renamed Module to FrontendModule
-import { fetchApi } from './utils/api';
-import { getIconByName } from './utils/iconMap';
+import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage';
+import { AdminCoursesPage } from './pages/Admin/AdminCoursesPage';
+import { AdminSectionsPage } from './pages/Admin/AdminSectionsPage';
+import { AdminLearningUnitsPage } from './pages/Admin/AdminLearningUnitsPage'; // Added
+import type { Module as FrontendModule, ApiCourse, ApiCourseSection, ApiLearningUnit, QuantumConceptType as QCTEnum, Concept as FrontendConcept } from './types';
+import { api } from './utils/api'; // Corrected: Use the new api object
+import { getIconByName } from './utils/iconMap'; // Restoring this for icon handling
 
 interface User {
   id: number;
@@ -22,20 +26,19 @@ const useAuth = () => {
   React.useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const response = await fetchApi('/api/auth/me');
-        if (response.ok) {
-          const userData: User = await response.json();
-          setUser(userData);
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error('Error checking auth status:', error);
+        // Corrected: Use api.get for the auth check
+        const response = await api.get<User>('/api/auth/me');
+        // The new api.get returns an object with a 'data' property upon success.
+        setUser(response.data);
+        setIsAuthenticated(true);
+      } catch (error: any) {
+        // Errors thrown by api.get will have a .data property (if server sent JSON error)
+        // or .message. We assume if it fails, user is not authenticated.
+        console.error('Error checking auth status:', error.data?.error || error.message);
         setIsAuthenticated(false);
         setUser(null);
-      } finally {
+      }
+      finally {
         setLoading(false);
       }
     };
@@ -69,6 +72,40 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* Admin Routes - Added Carefully */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses"
+          element={
+            <ProtectedRoute>
+              <AdminCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route // Add route for AdminSectionsPage
+          path="/admin/course/:courseId/sections"
+          element={(
+            <ProtectedRoute>
+              <AdminSectionsPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route // Add route for AdminLearningUnitsPage
+          path="/admin/course/:courseId/section/:sectionId/units"
+          element={(
+            <ProtectedRoute>
+              <AdminLearningUnitsPage />
+            </ProtectedRoute>
+          )}
+        />
+        {/* Course Display Routes */}
         <Route
           path="/course/:courseId/*"
           element={
@@ -77,8 +114,6 @@ const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        {/* Fallback route: if no courseId is specified, or an invalid one, this could redirect to a course selection page or a default course */}
-        {/* For now, redirecting to course 1, module 'intro-qubits' as a default landing after login */}
         <Route path="/*" element={<Navigate to="/course/1/module/intro-qubits" replace />} />
       </Routes>
     </Router>
@@ -89,144 +124,112 @@ const CourseLayout: React.FC = () => {
   const { courseId, "*": modulePath } = useParams<{ courseId: string; "*": string }>();
   const navigate = useNavigate();
 
-  const [modules, setModules] = useState<FrontendModule[]>([]); // Use FrontendModule type
+  const [modules, setModules] = useState<FrontendModule[]>([]);
   const [currentCourse, setCurrentCourse] = useState<ApiCourse | null>(null);
   const [currentModuleExternalId, setCurrentModuleExternalId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [completedModules, setCompletedModules] = React.useState<Set<string>>(new Set()); // TODO: Integrate with UserProgress API
 
-  const transformApiSectionToModule = useCallback((section: ApiCourseSection, units: ApiLearningUnit[]): FrontendModule => {
+  const transformApiSectionToModule = useCallback((section: ApiCourseSection, allUnits: ApiLearningUnit[]): FrontendModule => {
+    // Find units belonging to this section using section.id (DB primary key) and unit.section_id
+    const sectionUnits = allUnits.filter(unit => unit.section_id === section.id);
+
     return {
       id: section.external_id,
       title: section.title,
       storyIntro: section.story_intro || '',
-      icon: section.icon_ref || '', // Pass icon ref string, will be converted to ReactNode before Sidebar/ModuleContent
+      icon: section.icon_ref ? getIconByName(section.icon_ref) : getIconByName('DefaultIcon'), // Use getIconByName
+      concepts: sectionUnits
+        .sort((a, b) => (a.unit_order ?? 0) - (b.unit_order ?? 0))
+        .map((unit): FrontendConcept => ({
+          id: unit.external_id,
+          title: unit.title,
+          explanation: unit.explanation || '',
+          type: unit.unit_type as QCTEnum,
+          data: unit.unit_data ? JSON.parse(unit.unit_data) : {},
+        })),
       summary: section.summary || '',
-      concepts: units.map(unit => ({
-        id: unit.external_id,
-        title: unit.title,
-        explanation: unit.explanation, // Will be string (HTML)
-        type: unit.unit_type as QCTEnum, // Cast string to enum
-        data: unit.unit_data ? JSON.parse(unit.unit_data) : undefined,
-      })),
     };
   }, []);
 
   useEffect(() => {
-    const loadCourseData = async () => {
+    const fetchCourseData = async () => {
       if (!courseId) return;
       setIsLoading(true);
       setError(null);
       try {
-        // Attempt to fetch the specific course by its ID. 
-        // This assumes your API has an endpoint like /api/courses/:id that returns a single course object.
-        // If not, you might need to fetch all courses and then find the one with the matching courseId.
-        // For now, we'll assume /api/courses returns all courses and we filter client-side, or use a specific endpoint if available.
+        // Corrected: Use api.get for fetching course details
+        const courseDetailsResponse = await api.get<ApiCourse>(`/api/courses/${courseId}`);
+        setCurrentCourse(courseDetailsResponse.data);
+
+        // Corrected: Use api.get for fetching course sections
+        const sectionsResponse = await api.get<ApiCourseSection[]>(`/api/courses/${courseId}/sections`);
+        const sectionsData = sectionsResponse.data;
+
+        // Corrected: Use api.get for fetching all learning units for the course
+        const learningUnitsResponse = await api.get<ApiLearningUnit[]>(`/api/courses/${courseId}/units`); 
+        const allLearningUnitsForCourse = learningUnitsResponse.data;
+
+        const frontendModules = sectionsData
+          .sort((a,b) => (a.section_order ?? 0) - (b.section_order ?? 0))
+          .map(section => transformApiSectionToModule(section, allLearningUnitsForCourse));
         
-        // Option 1: Fetch all courses and find the current one (if /api/courses/:id is not available)
-        // const allCoursesRes = await fetchApi(`/api/courses`);
-        // if (!allCoursesRes.ok) throw new Error('Failed to fetch courses list');
-        // const allCoursesData: { courses: ApiCourse[] } = await allCoursesRes.json();
-        // const targetCourse = allCoursesData.courses.find(c => c.id.toString() === courseId);
-        // if (!targetCourse) throw new Error('Course not found');
-        // setCurrentCourse(targetCourse);
+        setModules(frontendModules);
 
-        // Option 2: Assume an endpoint /api/courses/:courseId exists (more efficient)
-        // This part is tricky if the API only gives a list. For now, let's simulate fetching course title later or assume it.
-        // We will primarily focus on sections and units for a given courseId.
-        // To get the course title, we might need another API call or adjust the /api/courses/:courseId/sections to include course title.
-        // For simplicity, we'll set a placeholder title or fetch it if the API supports it.
-        // Let's assume for now that we don't have a specific endpoint for a single course title and fetch all to find it.
-        const allCoursesRes = await fetchApi(`/api/courses`);
-        if (!allCoursesRes.ok) throw new Error('Failed to fetch courses list to find current course title');
-        const allCoursesData: { courses: ApiCourse[] } = await allCoursesRes.json();
-        const targetCourse = allCoursesData.courses.find(c => c.id.toString() === courseId);
-        setCurrentCourse(targetCourse || null); // Set current course, or null if not found
-
-        const sectionsRes = await fetchApi(`/api/courses/${courseId}/sections`);
-        if (!sectionsRes.ok) throw new Error('Failed to fetch sections');
-        const sectionsData: { sections: ApiCourseSection[] } = await sectionsRes.json();
-
-        if (!sectionsData.sections || sectionsData.sections.length === 0) {
-          setModules([]);
-          // If no specific module in URL, and no sections, this state is handled by render logic
-        } else {
-            const fetchedModules: FrontendModule[] = [];
-            for (const section of sectionsData.sections) {
-              // Corrected API path for fetching units
-              const unitsRes = await fetchApi(`/api/courses/sections/${section.id}/units`);
-              if (!unitsRes.ok) throw new Error(`Failed to fetch units for section ${section.id} (${section.title})`);
-              const unitsData: { units: ApiLearningUnit[] } = await unitsRes.json();
-              fetchedModules.push(transformApiSectionToModule(section, unitsData.units || []));
-            }
-            setModules(fetchedModules);
-
-            if (fetchedModules.length > 0) {
-                const currentPathModuleId = modulePath?.startsWith('module/') ? modulePath.split('/')[1] : undefined;
-                const targetModuleId = currentPathModuleId && fetchedModules.some(m => m.id === currentPathModuleId)
-                                        ? currentPathModuleId
-                                        : fetchedModules[0].id; // Default to first module if current path is invalid or not set
-                
-                if (targetModuleId !== currentPathModuleId) { // Avoid redundant navigation
-                    navigate(`/course/${courseId}/module/${targetModuleId}`, { replace: true });
-                }
-                setCurrentModuleExternalId(targetModuleId);
-            } else {
-                // No modules/sections, clear current module ID
-                setCurrentModuleExternalId(undefined);
-            }
+        if (modulePath && modulePath.startsWith('module/')) {
+          setCurrentModuleExternalId(modulePath.split('/')[1]);
+        } else if (frontendModules.length > 0) {
+          // Default to the first module if no specific module is in the path
+          navigate(`/course/${courseId}/module/${frontendModules[0].id}`, { replace: true });
+          setCurrentModuleExternalId(frontendModules[0].id);
         }
 
       } catch (err: any) {
-        console.error('Error loading course data:', err);
-        setError(err.message || 'Failed to load course content.');
+        console.error('Error fetching course layout data:', err);
+        // Adjust error message to use err.data or err.message from the api utility
+        setError(err.data?.error || err.message || 'An unknown error occurred while fetching course data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadCourseData();
-  }, [courseId, navigate, transformApiSectionToModule, modulePath]); // Added modulePath to dependencies
-
-  // This effect is to ensure currentModuleExternalId is correctly set from the URL path if it changes.
+    fetchCourseData();
+  }, [courseId, modulePath, navigate, transformApiSectionToModule]);
+  
+  // Effect to update currentModuleExternalId when modulePath changes from navigation
   useEffect(() => {
-    const currentPathId = modulePath?.startsWith('module/') ? modulePath.split('/')[1] : undefined;
-    if (currentPathId && modules.some(m => m.id === currentPathId)) {
-        setCurrentModuleExternalId(currentPathId);
-    } else if (modules.length > 0 && !currentPathId) {
-        // If path is base /course/:courseId/ and modules are loaded, set to first module
-        setCurrentModuleExternalId(modules[0].id);
+    if (modulePath && modulePath.startsWith('module/')) {
+      const pathModuleId = modulePath.split('/')[1];
+      if (pathModuleId !== currentModuleExternalId) {
+        setCurrentModuleExternalId(pathModuleId);
+      }
     }
-    // If currentPathId is undefined or invalid, and modules exist, previous effect should have navigated.
-    // If modules is empty, currentModuleExternalId will remain undefined.
-  }, [modulePath, modules]);
+  }, [modulePath, currentModuleExternalId]);
 
 
   const handleSelectModule = (moduleId: string) => {
-    // setCurrentModuleExternalId(moduleId); // This will be set by the navigation and subsequent useEffect
-    navigate(`/course/${courseId}/module/${moduleId}`);
+    if (courseId) {
+      navigate(`/course/${courseId}/module/${moduleId}`);
+    }
   };
 
-  const currentModuleIndex = modules.findIndex(m => m.id === currentModuleExternalId);
-  const currentModule = currentModuleIndex !== -1 ? modules[currentModuleIndex] : undefined;
+  const currentModule = modules.find(m => m.id === currentModuleExternalId);
 
   const handleNextModule = () => {
-    if (currentModule && currentModuleIndex < modules.length - 1) {
-      const nextModuleId = modules[currentModuleIndex + 1].id;
-      handleSelectModule(nextModuleId);
-      // setCompletedModules(prev => new Set(prev).add(currentModule.id)); // TODO: API call
-    } else if (currentModule && currentModuleIndex === modules.length - 1) {
-      // setCompletedModules(prev => new Set(prev).add(currentModule.id)); // TODO: API call
-      console.log("All modules completed for this course!");
-      // Potentially navigate to a course completion page or show a message
+    if (!currentModule) return;
+    const currentIndex = modules.findIndex(m => m.id === currentModule.id);
+    if (currentIndex < modules.length - 1) {
+      const nextModule = modules[currentIndex + 1];
+      navigate(`/course/${courseId}/module/${nextModule.id}`);
     }
   };
 
   const handlePrevModule = () => {
-    if (currentModuleIndex > 0) {
-      const prevModuleId = modules[currentModuleIndex - 1].id;
-      handleSelectModule(prevModuleId);
+    if (!currentModule) return;
+    const currentIndex = modules.findIndex(m => m.id === currentModule.id);
+    if (currentIndex > 0) {
+      const prevModule = modules[currentIndex - 1];
+      navigate(`/course/${courseId}/module/${prevModule.id}`);
     }
   };
 
@@ -235,46 +238,54 @@ const CourseLayout: React.FC = () => {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-screen bg-quantum-void text-red-400">Error: {error} <button onClick={() => navigate('/', {replace: true})} className='underline ml-2'>Go Home</button></div>;
+    return <div className="flex items-center justify-center h-screen bg-quantum-void text-white">Error: {error}</div>;
   }
 
-  if (!isLoading && modules.length === 0 && !error) {
-      return <div className="flex items-center justify-center h-screen bg-quantum-void text-white">No modules found for this course, or course not found. <button onClick={() => navigate('/', {replace: true})} className='underline ml-2'>Go Home</button></div>;
-  }
-  
-  // If modules are loaded, but currentModuleExternalId is somehow not set or invalid, and not loading/erroring
-  // This case should ideally be handled by navigation logic in useEffect to select a default module.
-  // If currentModule is still undefined here, it might mean an issue with modulePath or module list.
-  if (!currentModule && !isLoading && modules.length > 0 && currentModuleExternalId) {
-    return <div className="flex items-center justify-center h-screen bg-quantum-void text-yellow-400">Module <code className='mx-1'>{currentModuleExternalId}</code> not found. <button onClick={() => navigate(`/course/${courseId}/module/${modules[0].id}`, {replace: true})} className='underline ml-2'>Go to first module</button></div>;
+  if (!currentModule) {
+    return (
+      <div className="flex flex-col md:flex-row h-screen bg-quantum-void text-white overflow-hidden">
+        <Sidebar 
+          modules={modules} 
+          courseTitle={currentCourse?.title || 'Course'} 
+          currentModuleId={currentModuleExternalId} 
+          onSelectModule={handleSelectModule}
+        />
+        <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-quantum-glow mb-4">
+              {modules.length > 0 ? 'Select a module to begin' : 'Loading module content or no concepts available...'}
+            </h2>
+            <p className="text-quantum-text-secondary">Please select a module from the sidebar or check the URL.</p>
+            {courseId && !modulePath && modules.length > 0 && (
+                <button 
+                    onClick={() => navigate(`/course/${courseId}/module/${modules[0].id}`)} 
+                    className="mt-4 px-4 py-2 bg-quantum-particle text-white rounded hover:bg-sky-500 transition-colors"
+                >
+                    Go to First Module
+                </button>
+            )}
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className="flex h-screen bg-quantum-void text-quantum-text-primary">
-      <Sidebar
-        modules={modules.map(m => ({ ...m, icon: getIconByName(m.icon) }))} 
-        currentModuleId={currentModuleExternalId} 
-        onSelectModule={handleSelectModule} // This prop name and signature now matches SidebarProps
-        // completedModules={completedModules} // TODO: Integrate
-        courseTitle={currentCourse?.title || 'Quantum Adventure'}
+    <div className="flex flex-col md:flex-row h-screen bg-quantum-void text-white overflow-hidden">
+      <Sidebar 
+        modules={modules} 
+        courseTitle={currentCourse?.title || 'Course'} 
+        currentModuleId={currentModule.id} 
+        onSelectModule={handleSelectModule}
       />
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-800">
-        {currentModule ? (
-          <ModuleContent
-            module={{...currentModule, icon: getIconByName(currentModule.icon) }}
-            onNextModule={handleNextModule}
-            onPrevModule={handlePrevModule}
-            isFirstModule={currentModuleIndex === 0}
-            isLastModule={currentModuleIndex === modules.length - 1}
-            isModuleCompleted={false} // Placeholder
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xl text-quantum-text-secondary">
-              {isLoading ? 'Loading module...' : (modules.length > 0 ? 'Select a module to continue your Quantum Adventure!' : 'No modules available.')}
-            </p>
-          </div>
-        )}
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+        <ModuleContent
+          module={currentModule} // This is FrontendModule, which has icon as React.ReactNode
+          onNextModule={handleNextModule}
+          onPrevModule={handlePrevModule}
+          isFirstModule={modules.findIndex(m => m.id === currentModule.id) === 0}
+          isLastModule={modules.findIndex(m => m.id === currentModule.id) === modules.length - 1}
+        />
       </main>
     </div>
   );

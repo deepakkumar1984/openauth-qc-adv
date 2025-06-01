@@ -1,4 +1,4 @@
-import { fetchApi } from '@/src/utils/api';
+import { api } from '../../utils/api'; // Corrected: Use the new api object
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -62,25 +62,22 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetchApi('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
+      // Corrected: Use api.post for the login request
+      const response = await api.post('/api/auth/login', { email, password });
 
-      const data = await response.json() as { message?: string };
+      // The new api methods return an object with a 'data' property upon success.
+      // If the login is successful, the backend might not return a body (e.g. just sets a cookie)
+      // or it might return a user object or a success message.
+      // We\'ll assume for now that a successful login means we can redirect.
+      // The error handling in baseFetchApi will throw if response.ok is false.
+      
+      // Redirect to the main app or dashboard
+      window.location.href = '/';
 
-      if (response.ok) {
-        // Redirect to the main app or dashboard
-        window.location.href = '/';
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
+    } catch (err: any) {
+      // Errors thrown by baseFetchApi will have a .data property with the parsed error body
+      // and a .status property with the HTTP status code.
+      setError(err.data?.message || err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }

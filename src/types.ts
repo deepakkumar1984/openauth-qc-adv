@@ -14,7 +14,28 @@ export interface Concept {
   title: string;
   explanation: string; // HTML string from LearningUnits.explanation
   type: QuantumConceptType; // Corresponds to LearningUnits.unit_type
-  data?: any; // Parsed from LearningUnits.unit_data (JSON string)
+  data?: {
+    // Existing fields like initialAlpha, initialBeta, etc.
+    initialAlpha?: number;
+    initialBeta?: number;
+    initialQubitState?: QubitState;
+    availableGates?: QuantumGate[];
+    quizData?: QuizData;
+    numQubits?: number;
+    initialSteps?: CircuitStep[];
+    description?: string;
+    prompt?: string;
+    // New fields for custom components and their data
+    componentName?: string; // e.g., "QuantumWelcomeJourney"
+    text?: string; // For components that primarily display text like QuantumWelcomeJourney
+    problemStatement?: string;
+    hints?: string[];
+    expectedSolution?: string;
+    question?: string;
+    options?: QuizOption[];
+    feedbackCorrect?: string;
+    feedbackIncorrect?: string;
+  }; 
 }
 
 export interface Module {
@@ -23,12 +44,13 @@ export interface Module {
   storyIntro: string;
   concepts: Concept[];
   summary: string;
-  icon: string; // Icon reference string (e.g., 'AcademicCapIcon') from CourseSections.icon_ref
+  icon: React.ReactNode; // Changed from string to React.ReactNode
 }
 
 // API specific types to avoid confusion if needed, or integrate above carefully
 export interface ApiLearningUnit {
   id: number; // DB primary key
+  section_id: number; // Added to link to CourseSections.id
   external_id: string;
   title: string;
   explanation: string; // This will be HTML content as a string

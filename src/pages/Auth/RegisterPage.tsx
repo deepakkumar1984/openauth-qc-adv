@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { fetchApi } from '../../utils/api'; // Import the new API utility
+import { api } from '../../utils/api'; // Corrected: Use the new api object
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -16,24 +16,21 @@ const RegisterPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetchApi('/api/auth/register', { // Use fetchApi
-        method: 'POST',
-        // headers are handled by fetchApi
-        body: JSON.stringify({ email, username, password }),
-        credentials: 'include',
-      });
+      // Corrected: Use api.post for the registration request
+      await api.post('/api/auth/register', { email, username, password });
 
-      const data = await response.json() as { error?: string };
+      // If api.post is successful (i.e., doesn't throw an error),
+      // we can assume registration was successful.
+      // The backend might return data, but for registration, often a redirect or success status is enough.
+      
+      // Redirect to login page with success message
+      navigate('/login?registered=true'); 
 
-      if (response.ok) {
-        // Redirect to login page with success message
-        navigate('/login?registered=true'); 
-      } else {
-        setError(data.error || 'Registration failed. Please try again.');
-      }
-    } catch (err) {
+    } catch (err: any) {
+      // Errors thrown by baseFetchApi (used by api.post) will have a .data property 
+      // with the parsed error body and a .status property with the HTTP status code.
       console.error('Registration request failed:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError(err.data?.error || err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
