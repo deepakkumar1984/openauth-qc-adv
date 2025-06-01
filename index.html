@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantum Adventure</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'quantum-void': '#111827', // Dark blue-gray, like space
+            'quantum-particle': '#0ea5e9', // Bright sky blue for interactive elements
+            'quantum-glow': '#8b5cf6', // Violet for accents and highlights
+            'quantum-text-primary': '#e0f2fe', // Light sky blue for primary text
+            'quantum-text-secondary': '#a5f3fc', // Cyan for secondary text
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'fade-in': 'fadeIn 0.5s ease-out',
+            'slide-in-left': 'slideInLeft 0.5s ease-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: 0 },
+              '100%': { opacity: 1 },
+            },
+            slideInLeft: {
+              '0%': { transform: 'translateX(-20px)', opacity: 0 },
+              '100%': { transform: 'translateX(0)', opacity: 1 },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/academic-cap.svg" rel="preload" as="image" type="image/svg+xml">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/light-bulb.svg" rel="preload" as="image" type="image/svg+xml">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/code-bracket-square.svg" rel="preload" as="image" type="image/svg+xml">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/puzzle-piece.svg" rel="preload" as="image" type="image/svg+xml">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.18/24/outline/sparkles.svg" rel="preload" as="image" type="image/svg+xml">
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-quantum-void text-quantum-text-primary font-sans">
+  <div id="root"></div>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+</html>
