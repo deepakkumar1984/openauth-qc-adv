@@ -51,8 +51,8 @@ auth.post('/register', async (c) => {
 
     setCookie(c, 'session', sessionToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
+      secure: false, // Set to false for localhost development
+      sameSite: 'Lax', // Changed from 'Strict' to 'Lax' for cross-origin
       expires,
     });
 
@@ -80,11 +80,10 @@ auth.post('/login', async (c) => {
       return c.json({ error: 'Email and password are required' }, 400);
     }
 
-    // Find user
     const user = await c.env.DB.prepare(
-      'SELECT id, email, username, hashed_password FROM Users WHERE email = ?1 AND auth_provider = "email"'
-    ).bind(email).first<User & { hashed_password: string } | null>();
-
+      'SELECT id, email, username, hashed_password FROM Users WHERE email = ?1 AND auth_provider = ?2'
+    ).bind(email, 'email').first<User & { hashed_password: string } | null>();
+    
     if (!user) {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
@@ -106,8 +105,8 @@ auth.post('/login', async (c) => {
 
     setCookie(c, 'session', sessionToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
+      secure: false, // Set to false for localhost development
+      sameSite: 'Lax', // Changed from 'Strict' to 'Lax' for cross-origin
       expires,
     });
 
@@ -151,7 +150,7 @@ auth.post('/logout', async (c) => {
 auth.get('/me', async (c) => {
   try {
     const sessionToken = getCookie(c, 'session');
-
+    console.log('Session token:', sessionToken);
     if (!sessionToken) {
       return c.json({ error: 'Not authenticated' }, 401);
     }
@@ -239,8 +238,8 @@ auth.get('/oauth/:provider/callback', async (c) => {
 
     setCookie(c, 'session', sessionToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'Strict',
+      secure: false, // Set to false for localhost development
+      sameSite: 'Lax', // Changed from 'Strict' to 'Lax' for cross-origin
       expires,
     });
 

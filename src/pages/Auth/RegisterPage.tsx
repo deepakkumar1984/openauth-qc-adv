@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { fetchApi } from '../../utils/api'; // Import the new API utility
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,11 +16,9 @@ const RegisterPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/local/register', {
+      const response = await fetchApi('/api/auth/register', { // Use fetchApi
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        // headers are handled by fetchApi
         body: JSON.stringify({ email, username, password }),
         credentials: 'include',
       });

@@ -6,6 +6,7 @@ import { MODULES } from './constants'; // Import MODULES
 import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage'; // Import RegisterPage
 import type { Module } from './types'; // Import Module type
+import { fetchApi } from './utils/api';
 
 interface User {
   id: number;
@@ -21,7 +22,7 @@ const useAuth = () => {
   React.useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetchApi('/api/auth/me');
         if (response.ok) {
           const userData: User = await response.json();
           setUser(userData);

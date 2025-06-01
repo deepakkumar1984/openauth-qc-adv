@@ -1,3 +1,4 @@
+import { fetchApi } from '@/src/utils/api';
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -61,7 +62,7 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/local/login', {
+      const response = await fetchApi('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
