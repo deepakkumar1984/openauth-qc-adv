@@ -137,3 +137,5 @@ const PracticePage: React.FC = () => {
 };
 
 export default PracticePage;
+export * from './SingleQubitPlayground';
+export * from './MultiQubitPlayground';

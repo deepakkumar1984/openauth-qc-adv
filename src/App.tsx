@@ -6,6 +6,7 @@ import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import PracticePage from './pages/Practice';
 import SingleQubitPlayground from './pages/Practice/SingleQubitPlayground';
+import { MultiQubitPlayground } from './pages/Practice/MultiQubitPlayground'; // Added import
 import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage';
 import { AdminCoursesPage } from './pages/Admin/AdminCoursesPage';
 import { AdminSectionsPage } from './pages/Admin/AdminSectionsPage';
@@ -121,6 +122,14 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <SingleQubitPlayground />
+            </ProtectedRoute>
+          }
+        />
+        <Route // Added route for MultiQubitPlayground
+          path="/practice/multi-qubit"
+          element={
+            <ProtectedRoute>
+              <MultiQubitPlayground />
             </ProtectedRoute>
           }
         />
