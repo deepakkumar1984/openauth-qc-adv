@@ -2,7 +2,7 @@
 
 name = "quantum-adventure"
 main = "functions/_worker.ts"
-compatibility_date = "2024-01-15"
+compatibility_date = "2025-06-01"
 compatibility_flags = ["nodejs_compat"]
 
 # D1 Database binding

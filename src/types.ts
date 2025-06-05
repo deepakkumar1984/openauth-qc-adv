@@ -79,16 +79,29 @@ export interface ApiCourse {
 }
 
 // For QubitVisualizer and GateApplication
-export interface QubitState {
-  alpha: number; // Amplitude for |0>
-  beta: number;  // Amplitude for |1>
-}
-
 export enum QuantumGate {
   X = 'X', // Pauli-X (NOT)
-  H = 'H', // Hadamard
+  Y = 'Y', // Pauli-Y
   Z = 'Z', // Pauli-Z
-  CNOT = 'CNOT' // Controlled-NOT (requires 2 qubits)
+  H = 'H', // Hadamard
+  S = 'S', // S gate (phase gate)
+  T = 'T', // T gate (π/8 gate)
+  RX = 'RX', // Rotation around X-axis
+  RY = 'RY', // Rotation around Y-axis
+  RZ = 'RZ', // Rotation around Z-axis
+  CNOT = 'CNOT', // Controlled-NOT (requires 2 qubits)
+  SWAP = 'SWAP', // Swap gate (requires 2 qubits)
+  MEASURE = 'MEASURE' // Measurement gate
+}
+
+export interface ComplexNumber {
+  re: number; // Real part
+  im: number; // Imaginary part
+}
+
+export interface QubitState {
+  alpha: ComplexNumber;
+  beta: ComplexNumber;
 }
 
 export interface QuizOption {
@@ -107,4 +120,10 @@ export interface CircuitStep {
   qubitIndex: number; // 0 or 1 for 2-qubit system
   gate: QuantumGate;
   controlQubitIndex?: number; // For CNOT
+}
+
+export interface SingleQubitCircuitStep {
+  id: string;
+  gate: QuantumGate;
+  parameter?: number; // For rotation gates
 }

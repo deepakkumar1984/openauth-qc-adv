@@ -4,6 +4,8 @@ import { Sidebar } from './components/Sidebar';
 import { ModuleContent } from './components/ModuleContent';
 import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
+import PracticePage from './pages/Practice';
+import SingleQubitPlayground from './pages/Practice/SingleQubitPlayground';
 import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage';
 import { AdminCoursesPage } from './pages/Admin/AdminCoursesPage';
 import { AdminSectionsPage } from './pages/Admin/AdminSectionsPage';
@@ -104,6 +106,23 @@ const App: React.FC = () => {
               <AdminLearningUnitsPage />
             </ProtectedRoute>
           )}
+        />
+        {/* Practice Routes */}
+        <Route
+          path="/practice"
+          element={
+            <ProtectedRoute>
+              <PracticePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practice/single-qubit"
+          element={
+            <ProtectedRoute>
+              <SingleQubitPlayground />
+            </ProtectedRoute>
+          }
         />
         {/* Course Display Routes */}
         <Route
